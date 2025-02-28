@@ -7,6 +7,7 @@ from pathlib import Path
 from tempfile import mkdtemp
 from unittest import mock
 
+import pytest
 from twisted.trial import unittest
 from zope.interface.verify import verifyObject
 
@@ -97,6 +98,25 @@ class SpiderLoaderTest(unittest.TestCase):
         self.spider_loader = SpiderLoader.from_settings(settings)
         assert len(self.spider_loader._spiders) == 0
 
+    def test_load_spider_module_from_addons(self):
+        module = "tests.test_spiderloader.spiders_from_addons.spider0"
+
+        class SpiderModuleAddon:
+            @classmethod
+            def update_pre_crawler_settings(cls, settings):
+                settings.set(
+                    "SPIDER_MODULES",
+                    [module],
+                    "project",
+                )
+
+        runner = CrawlerRunner({"ADDONS": {SpiderModuleAddon: 1}})
+
+        crawler = runner.create_crawler("spider_from_addon")
+        self.assertTrue(issubclass(crawler.spidercls, scrapy.Spider))
+        self.assertEqual(crawler.spidercls.name, "spider_from_addon")
+        self.assertTrue(len(crawler.settings["SPIDER_MODULES"]) == 1)
+
     def test_crawler_runner_loading(self):
         module = "tests.test_spiderloader.test_spiders.spider1"
         runner = CrawlerRunner(
@@ -105,9 +125,8 @@ class SpiderLoaderTest(unittest.TestCase):
             }
         )
 
-        self.assertRaisesRegex(
-            KeyError, "Spider not found", runner.create_crawler, "spider2"
-        )
+        with pytest.raises(KeyError, match="Spider not found"):
+            runner.create_crawler("spider2")
 
         crawler = runner.create_crawler("spider1")
         self.assertTrue(issubclass(crawler.spidercls, scrapy.Spider))
@@ -116,7 +135,8 @@ class SpiderLoaderTest(unittest.TestCase):
     def test_bad_spider_modules_exception(self):
         module = "tests.test_spiderloader.test_spiders.doesnotexist"
         settings = Settings({"SPIDER_MODULES": [module]})
-        self.assertRaises(ImportError, SpiderLoader.from_settings, settings)
+        with pytest.raises(ImportError):
+            SpiderLoader.from_settings(settings)
 
     def test_bad_spider_modules_warning(self):
         with warnings.catch_warnings(record=True) as w:
@@ -140,7 +160,8 @@ class SpiderLoaderTest(unittest.TestCase):
         with mock.patch.object(SpiderLoader, "_load_spiders") as m:
             m.side_effect = SyntaxError
             settings = Settings({"SPIDER_MODULES": [module]})
-            self.assertRaises(SyntaxError, SpiderLoader.from_settings, settings)
+            with pytest.raises(SyntaxError):
+                SpiderLoader.from_settings(settings)
 
     def test_syntax_error_warning(self):
         with (

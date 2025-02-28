@@ -1,5 +1,6 @@
 import unittest
 
+import pytest
 from w3lib.http import basic_auth_header
 
 from scrapy.downloadermiddlewares.httpauth import HttpAuthMiddleware
@@ -7,18 +8,18 @@ from scrapy.http import Request
 from scrapy.spiders import Spider
 
 
-class TestSpiderLegacy(Spider):
+class LegacySpider(Spider):
     http_user = "foo"
     http_pass = "bar"
 
 
-class TestSpider(Spider):
+class DomainSpider(Spider):
     http_user = "foo"
     http_pass = "bar"
     http_auth_domain = "example.com"
 
 
-class TestSpiderAny(Spider):
+class AnyDomainSpider(Spider):
     http_user = "foo"
     http_pass = "bar"
     http_auth_domain = None
@@ -26,18 +27,18 @@ class TestSpiderAny(Spider):
 
 class HttpAuthMiddlewareLegacyTest(unittest.TestCase):
     def setUp(self):
-        self.spider = TestSpiderLegacy("foo")
+        self.spider = LegacySpider("foo")
 
     def test_auth(self):
-        with self.assertRaises(AttributeError):
-            mw = HttpAuthMiddleware()
+        mw = HttpAuthMiddleware()
+        with pytest.raises(AttributeError):
             mw.spider_opened(self.spider)
 
 
 class HttpAuthMiddlewareTest(unittest.TestCase):
     def setUp(self):
         self.mw = HttpAuthMiddleware()
-        self.spider = TestSpider("foo")
+        self.spider = DomainSpider("foo")
         self.mw.spider_opened(self.spider)
 
     def tearDown(self):
@@ -67,7 +68,7 @@ class HttpAuthMiddlewareTest(unittest.TestCase):
 class HttpAuthAnyMiddlewareTest(unittest.TestCase):
     def setUp(self):
         self.mw = HttpAuthMiddleware()
-        self.spider = TestSpiderAny("foo")
+        self.spider = AnyDomainSpider("foo")
         self.mw.spider_opened(self.spider)
 
     def tearDown(self):
